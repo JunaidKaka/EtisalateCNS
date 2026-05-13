@@ -10,6 +10,7 @@ import com.etisalat.services.TemplateService;
 
 import com.etisalat.utils.ResponseBuilder;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,9 +23,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @RestController
 @RequestMapping("/api/templates")
@@ -212,22 +216,49 @@ public class TemplateController {
 
     }
 
-    @GetMapping("/{id}/download")
+    @PostMapping("/download")
     @PreAuthorize("hasAnyAuthority('DEV','QA','OPERATION')")
-    public ResponseEntity<byte[]> downloadHtml(@PathVariable Long id) {
-        Template t = templateService.getById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Template not found"));
+    public void downloadTemplates(
+            @RequestBody List<Long> ids,
+            HttpServletResponse response) throws IOException {
 
-        String filename = safeFileName(t.getTitle(), id) + ".html";
-        byte[] bytes = t.getContent() == null ? new byte[0] : t.getContent().getBytes(StandardCharsets.UTF_8);
+        if (ids == null || ids.isEmpty()) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "No template IDs provided");
+            return;
+        }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.TEXT_HTML);
-        headers.setContentLength(bytes.length);
-        headers.add(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition(filename));
+        if (ids.size() == 1) {
+            Template t = templateService.getById(ids.get(0))
+                    .orElseThrow(() -> new EntityNotFoundException("Template not found"));
 
-        return new ResponseEntity<>(bytes, headers, HttpStatus.OK);
+            String filename = safeFileName(t.getTitle(), t.getId()) + ".html";
+            byte[] bytes = t.getContent() == null ? new byte[0] : t.getContent().getBytes(StandardCharsets.UTF_8);
+
+            response.setContentType(MediaType.TEXT_HTML_VALUE);
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition(filename));
+            response.setContentLength(bytes.length);
+            response.getOutputStream().write(bytes);
+            return;
+        }
+
+        response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition("templates.zip"));
+
+        try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+           //
+            List<Template>  templates = templateService.getTemplatesByIds(ids);
+            for (Template t : templates) {
+                String filename = safeFileName(t.getTitle(), t.getId()) + ".html";
+                byte[] content = t.getContent() == null ? new byte[0] : t.getContent().getBytes(StandardCharsets.UTF_8);
+                ZipEntry entry = new ZipEntry(filename);
+                zos.putNextEntry(entry);
+                zos.write(content);
+                zos.closeEntry();
+            }
+            zos.finish();
+        }
     }
+
 
     private static String safeFileName(String title, Long id) {
         String base = (title == null || title.isBlank()) ? "template-" + id : title.trim();

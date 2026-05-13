@@ -84,7 +84,7 @@ public class Template {
     @Column(nullable = false)
     private TemplateStatus status;
 
-    private Boolean editable = true;
+    private Boolean editable ;
 
     // reason / comments from QA (optional)
     @Column(name="qa_comments", length = 2000)

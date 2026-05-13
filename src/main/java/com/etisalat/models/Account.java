@@ -16,6 +16,8 @@ public class Account {
     @Column(unique=true, nullable=false)
     private String accountNo;
 
+    @Column
+    private String email;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")

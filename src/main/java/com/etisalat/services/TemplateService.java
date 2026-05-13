@@ -68,7 +68,7 @@ public class TemplateService {
 
         List<String> allowedFields = List.of(
                 "notid", "shortCode", "content","language", "status", "sname", "senderId", "title", "shortDesc", "createdBy.username",
-                "changedAt"
+                "createdAt"
         );
 
         List<String> globalFields = List.of("notid", "shortCode", "content", "title", "sname", "senderId");
@@ -204,6 +204,10 @@ public class TemplateService {
 
         CompletableFuture.runAsync(() -> templateHistoryService.updateTemplate(id, req, user.get())) ;
         return templateRepository.save(t);
+    }
+
+    public List<Template> getTemplatesByIds(List<Long> ids) {
+        return templateRepository.findAllByIdIn(ids);
     }
 
     @Transactional(readOnly = true)

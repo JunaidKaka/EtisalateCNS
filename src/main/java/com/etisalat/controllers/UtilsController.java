@@ -37,8 +37,7 @@ public class UtilsController {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("user not found"));
 
-        List<Account> accountList = accountRepo.findAccountByUserId(user);
-
+        List<Account> accountList = accountRepo.findAll();
         return ResponseEntity.ok(
                 ResponseBuilder.success(
                         accountList,

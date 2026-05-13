@@ -1,8 +1,10 @@
 package com.etisalat;
 
+import com.etisalat.models.Account;
 import com.etisalat.models.Project;
 import com.etisalat.models.Role;
 import com.etisalat.models.User;
+import com.etisalat.repos.AccountRepo;
 import com.etisalat.repos.ProjectRepository;
 import com.etisalat.repos.RoleRepository;
 import com.etisalat.repos.UserRepository;
@@ -22,6 +24,7 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepo;
     private final ProjectRepository projectRepo;
     private final PasswordEncoder passwordEncoder;
+    private final AccountRepo accountRepo;
 
     @Override
     public void run(String... args) {
@@ -45,17 +48,40 @@ public class DataInitializer implements CommandLineRunner {
             projectRepo.findByLabel(p)
                     .orElseGet(() -> projectRepo.save(new Project(null, p)));
         });
+
+        initAccounts();
     }
 
     private void createUserIfNotExists(String username, String password, String roleName) {
         if (userRepo.findByUsername(username).isEmpty()) {
             Role role = roleRepo.findByName(roleName)
-                                .orElseThrow(() -> new RuntimeException("Role not found: " + roleName));
+                    .orElseThrow(() -> new RuntimeException("Role not found: " + roleName));
             User user = new User();
             user.setUsername(username);
             user.setPassword(passwordEncoder.encode(password));
             user.setRoles(Set.of(role));
             userRepo.save(user);
         }
+    }
+
+    private void initAccounts() {
+
+        accountRepo.deleteAll();
+        Account account = new Account();
+        account.setAccountNo("05412312343");
+        account.setEmail("test@gmail.com");
+
+
+        Account account1 = new Account();
+        account1.setAccountNo("05612312343");
+        account1.setEmail("jnk@gmail.com");
+
+        if (accountRepo.findAccountByAccountNo("05412312343") == null) {
+            accountRepo.save(account1);
+        }
+        if (accountRepo.findAccountByAccountNo("05612312343") == null) {
+            accountRepo.save(account);
+        }
+
     }
 }

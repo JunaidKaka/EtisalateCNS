@@ -1,6 +1,7 @@
 package com.etisalat.repos;
 
-import com.etisalat.dto.FilterDescriptor;
+import com.etisalat.dto
+        .FilterDescriptor;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -156,6 +157,8 @@ public class GenericSpecifications<T> {
                             // prefer equals/in if matchMode suggests equality, otherwise fallback to 'in'
                             if (chosenMatchMode != null && chosenMatchMode.equalsIgnoreCase("equals")) {
                                 fd.setMatchMode("in");
+                            } else if (chosenMatchMode != null && chosenMatchMode.equalsIgnoreCase("between")) {
+                                fd.setMatchMode("between");
                             } else {
                                 fd.setMatchMode("in");
                             }
@@ -255,13 +258,105 @@ public class GenericSpecifications<T> {
                 }
                 break;
             case "between":
-                if (value instanceof List) {
-                    List<?> list = (List<?>) value;
+                if (value instanceof Collection<?> coll) {
+                    List<?> list = new ArrayList<>(coll);
                     if (list.size() >= 2) {
-                        Object c1 = convertValue(javaType, list.get(0));
-                        Object c2 = convertValue(javaType, list.get(1));
+
+                        Object v1 = list.get(0);
+                        Object v2 = list.get(1);
+
+                        if (v1 == null || v2 == null) return null;
+
+                        // ===== Instant =====
+                        if (javaType == Instant.class) {
+
+                            // STEP 1: Convert incoming ISO → LocalDate (IGNORE TIME)
+                            LocalDate startDate = Instant.parse(String.valueOf(v1))
+                                    .atZone(ZoneOffset.UTC)
+                                    .toLocalDate();
+
+                            LocalDate endDate = Instant.parse(String.valueOf(v2))
+                                    .atZone(ZoneOffset.UTC)
+                                    .toLocalDate();
+
+                            // STEP 2: Rebuild FULL DAY range
+                            Instant start = startDate
+                                    .atStartOfDay(ZoneOffset.UTC)
+                                    .toInstant();
+
+                            Instant end = endDate
+                                    .plusDays(1)
+                                    .atStartOfDay(ZoneOffset.UTC)
+                                    .minusNanos(1)
+                                    .toInstant();
+
+                            return cb.between(path.as(Instant.class), start, end);
+                        }
+
+                        // ===== LocalDateTime =====
+                        if (javaType == LocalDateTime.class) {
+                            LocalDateTime start = Instant.parse(String.valueOf(v1))
+                                    .atZone(ZoneOffset.UTC)
+                                    .toLocalDate()
+                                    .atStartOfDay();
+
+                            LocalDateTime end = Instant.parse(String.valueOf(v2))
+                                    .atZone(ZoneOffset.UTC)
+                                    .toLocalDate()
+                                    .plusDays(1)
+                                    .atStartOfDay()
+                                    .minusNanos(1);
+
+                            return cb.between(path.as(LocalDateTime.class), start, end);
+                        }
+
+                        // ===== LocalDate =====
+                        if (javaType == LocalDate.class) {
+                            LocalDate d1 = Instant.parse(String.valueOf(v1))
+                                    .atZone(ZoneOffset.UTC)
+                                    .toLocalDate();
+
+                            LocalDate d2 = Instant.parse(String.valueOf(v2))
+                                    .atZone(ZoneOffset.UTC)
+                                    .toLocalDate();
+
+                            return cb.between(path.as(LocalDate.class), d1, d2);
+                        }
+
+                        // ===== java.util.Date =====
+                        if (Date.class.isAssignableFrom(javaType)) {
+                            Instant i1 = Instant.parse(String.valueOf(v1));
+                            Instant i2 = Instant.parse(String.valueOf(v2));
+
+                            Date start = Date.from(
+                                    i1.atZone(ZoneOffset.UTC)
+                                            .toLocalDate()
+                                            .atStartOfDay(ZoneOffset.UTC)
+                                            .toInstant()
+                            );
+
+                            Date end = Date.from(
+                                    i2.atZone(ZoneOffset.UTC)
+                                            .toLocalDate()
+                                            .plusDays(1)
+                                            .atStartOfDay(ZoneOffset.UTC)
+                                            .minusNanos(1)
+                                            .toInstant()
+                            );
+
+                            return cb.between(path.as(Date.class), start, end);
+                        }
+
+                        // ===== Fallback (numbers etc.) =====
+                        Object c1 = convertValue(javaType, v1);
+                        Object c2 = convertValue(javaType, v2);
+
                         if (Comparable.class.isAssignableFrom(javaType)) {
-                            return cb.between((Expression) path.as((Class) javaType), (Comparable) c1, (Comparable) c2);
+                            return cb.between(
+                                    (Expression) path.as((Class) javaType),
+                                    (Comparable) c1,
+                                    (Comparable) c2
+                            );
                         }
                     }
                 }

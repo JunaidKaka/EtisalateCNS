@@ -36,6 +36,11 @@ public interface TemplateRepository extends JpaRepository<Template, Long>, JpaSp
     """)
     Page<Template> search(@Param("like") String like, Pageable pageable);
 
+
+        List<Template> findAllByIdIn(List<Long> ids);
+
+
+
     @Query("SELECT DISTINCT t.sname FROM Template t WHERE t.sname IS NOT NULL ORDER BY t.sname")
     List<String> findDistinctSystemNames();
 
